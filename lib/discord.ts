@@ -49,7 +49,7 @@ export class DiscordWebhook {
         msg += `💰 **GPU Prices & Deals**\n\n`;
         for (const n of priceNews.slice(0, 4)) {
           const time = n.time ? ` · _${n.time}_` : '';
-          msg += `▸ **${n.headline}**\n`;
+          msg += `▸ [**${n.headline}**](${n.link})\n`;
           msg += `  ${n.source}${time}\n\n`;
         }
       }
@@ -59,7 +59,7 @@ export class DiscordWebhook {
         msg += `📰 **Industry & Launches**\n\n`;
         for (const n of industryNews.slice(0, 4)) {
           const time = n.time ? ` · _${n.time}_` : '';
-          msg += `▸ **${n.headline}**\n`;
+          msg += `▸ [**${n.headline}**](${n.link})\n`;
           msg += `  ${n.source}${time}\n\n`;
         }
       }
@@ -69,7 +69,7 @@ export class DiscordWebhook {
         msg += `🤖 **AI & Datacenter**\n\n`;
         for (const n of aiNews.slice(0, 4)) {
           const time = n.time ? ` · _${n.time}_` : '';
-          msg += `▸ **${n.headline}**\n`;
+          msg += `▸ [**${n.headline}**](${n.link})\n`;
           msg += `  ${n.source}${time}\n\n`;
         }
       }
@@ -79,7 +79,7 @@ export class DiscordWebhook {
         msg += `📰 **Today's Headlines**\n\n`;
         for (const n of news.slice(0, 8)) {
           const time = n.time ? ` · _${n.time}_` : '';
-          msg += `▸ **${n.headline}**\n`;
+          msg += `▸ [**${n.headline}**](${n.link})\n`;
           msg += `  ${n.source}${time}\n\n`;
         }
       }
