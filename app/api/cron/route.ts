@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { scanForDeals } from '@/lib/scraper';
 import { scrapeNews, formatNewsForDiscord } from '@/lib/news-scraper';
-import { getKnownLeads } from '@/lib/market-intel';
+import { scrapeLeads } from '@/lib/market-intel';
 import { DiscordWebhook } from '@/lib/discord';
 import { hasBeenPosted, markPosted, purgeExpired, saveListings } from '@/lib/dedup';
 
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     // 4. Post intel drop to Discord
     let discordStatus = 'no-new';
     if (newListings.length > 0) {
-      const leads = getKnownLeads();
+      const leads = await scrapeLeads();
       discordStatus = await discord.sendIntelDrop({
         listings: newListings,
         totalScanned,

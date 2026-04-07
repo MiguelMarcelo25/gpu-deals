@@ -1,96 +1,129 @@
+import { getBrowser, closeBrowser } from './browser';
 import type { DatacenterLead } from './types';
 
 /**
- * Known ITAD / Liquidation contacts for datacenter GPU sourcing.
- * These are curated leads — the dashboard displays them for outreach tracking.
+ * Scrape Google for real ITAD / datacenter liquidation companies.
+ * Rotates queries each run.
  */
-const KNOWN_LEADS: DatacenterLead[] = [
-  {
-    id: 'lead-001',
-    company: 'TechWaste Recycling Inc.',
-    website: 'techwasterecycling.com',
-    type: 'ITAD',
-    description: 'NIST 800-88 & R2v3 certified data center decommissioning. Partners with enterprise clients doing full DC teardowns.',
-    location: 'USA (National)',
-    outreachAngle: 'Bulk purchase agreements for liquidated enterprise GPU inventory',
-    status: 'new',
-    addedAt: new Date().toISOString(),
-    notes: 'High potential — handles enterprise DC teardowns regularly',
-  },
-  {
-    id: 'lead-002',
-    company: 'Excess IT Hardware',
-    website: 'excessithardware.com',
-    type: 'Liquidator',
-    description: 'Full-spectrum data center liquidation. Specialize in value recovery from DC shutdowns.',
-    location: 'Boynton Beach, FL',
-    outreachAngle: 'Direct purchase from their liquidation pipeline',
-    status: 'new',
-    addedAt: new Date().toISOString(),
-    notes: 'Track assets by serial for compliance; good for audited purchases',
-  },
-  {
-    id: 'lead-003',
-    company: 'Compute Exchange',
-    website: 'computeexchange.com',
-    type: 'Reseller',
-    description: 'GPU brokerage and resale marketplace for enterprise hardware. Strong resale velocity reported.',
-    location: 'USA',
-    outreachAngle: 'Partnership for early access to incoming GPU inventory before public listing',
-    status: 'new',
-    addedAt: new Date().toISOString(),
-    notes: 'Seeing strong resale velocity per recent reports',
-  },
-  {
-    id: 'lead-004',
-    company: 'Iron Mountain ITAD',
-    website: 'ironmountain.com',
-    type: 'ITAD',
-    description: 'Enterprise ITAD services with certified data destruction. Handles Fortune 500 decommissions.',
-    location: 'USA (National)',
-    outreachAngle: 'GPU-specific bulk purchase from their ITAD pipeline',
-    status: 'new',
-    addedAt: new Date().toISOString(),
-    notes: 'Massive scale — handles F500 clients',
-  },
-  {
-    id: 'lead-005',
-    company: 'Accio.com',
-    website: 'accio.com',
-    type: 'Reseller',
-    description: 'B2B marketplace with 13,000+ suppliers. Active bulk RTX 4090 listings from Chinese wholesalers.',
-    location: 'Global',
-    outreachAngle: 'Volume pricing negotiation for 10+ unit GPU lots',
-    status: 'new',
-    addedAt: new Date().toISOString(),
-    notes: 'Current pricing $2,239-$3,125/unit (5+ min order). 50,000+ suppliers.',
-  },
-  {
-    id: 'lead-006',
-    company: 'Curvature (Park Place Technologies)',
-    website: 'curvature.com',
-    type: 'ITAD',
-    description: 'Major ITAD player — buys, refurbs, and resells datacenter hardware at scale.',
-    location: 'USA / Global',
-    outreachAngle: 'Bulk GPU buy from their refurb pipeline; ask about upcoming DC teardowns',
-    status: 'new',
-    addedAt: new Date().toISOString(),
-    notes: 'One of the largest ITAD operations globally',
-  },
-  {
-    id: 'lead-007',
-    company: 'MarkITx (Arrow Electronics)',
-    website: 'markitx.com',
-    type: 'ITAD',
-    description: 'Arrow Electronics ITAD arm. Processes massive volumes of enterprise hardware.',
-    location: 'USA / Global',
-    outreachAngle: 'GPU-specific buyback from enterprise refresh cycles',
-    status: 'new',
-    addedAt: new Date().toISOString(),
-    notes: 'Arrow is a Fortune 500; their ITAD sees huge volumes',
-  },
+
+const LEAD_QUERIES = [
+  'datacenter GPU liquidation company',
+  'ITAD GPU decommission services',
+  'datacenter asset recovery GPU',
+  'bulk GPU liquidation service',
+  'enterprise GPU buyback company',
+  'data center equipment liquidator GPU',
+  'GPU server decommission ITAD',
+  'datacenter hardware reseller GPU bulk',
 ];
 
-export function getKnownLeads(): DatacenterLead[] {
-  return KNOWN_LEADS;
+function pickLeadQueries(count: number = 2): string[] {
+  const now = Date.now();
+  return LEAD_QUERIES
+    .map((q, i) => ({ q, sort: Math.sin(now / 1000 + i * 71.3) }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(x => x.q)
+    .slice(0, count);
+}
+
+export async function scrapeLeads(): Promise<DatacenterLead[]> {
+  const queries = pickLeadQueries(2);
+  const allLeads: DatacenterLead[] = [];
+
+  try {
+    const browser = await getBrowser();
+
+    for (const query of queries) {
+      const page = await browser.newPage();
+      try {
+        await page.evaluateOnNewDocument(() => {
+          Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        });
+        await page.setRequestInterception(true);
+        page.on('request', r => {
+          if (['image', 'font', 'media', 'stylesheet'].includes(r.resourceType())) r.abort();
+          else r.continue();
+        });
+
+        const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=10`;
+        try {
+          await page.goto(url, { waitUntil: 'load', timeout: 20000 });
+        } catch { /* redirect possible */ }
+
+        await new Promise(r => setTimeout(r, 3000));
+
+        const results: { title: string; link: string; snippet: string }[] = await page.evaluate(() => {
+          const items: { title: string; link: string; snippet: string }[] = [];
+          const searchResults = document.querySelectorAll('#search .g, #rso .g');
+
+          for (const g of searchResults) {
+            const linkEl = g.querySelector('a[href^="http"]');
+            const titleEl = g.querySelector('h3');
+            const snippetEl = g.querySelector('[data-sncf], .VwiC3b, [style*="-webkit-line-clamp"]');
+
+            if (!linkEl || !titleEl) continue;
+
+            const link = (linkEl as HTMLAnchorElement).href;
+            const title = titleEl.textContent?.trim() || '';
+            const snippet = (snippetEl as HTMLElement)?.innerText?.trim() || '';
+
+            // Skip Google/YouTube/Wikipedia/Reddit
+            if (link.includes('google.com') || link.includes('youtube.com') || link.includes('wikipedia.org') || link.includes('reddit.com')) continue;
+
+            if (title.length > 5 && items.length < 4) {
+              items.push({ title, link, snippet: snippet.slice(0, 200) });
+            }
+          }
+          return items;
+        });
+
+        for (const r of results) {
+          // Extract domain
+          let website = '';
+          try { website = new URL(r.link).hostname.replace('www.', ''); } catch { continue; }
+
+          // Determine type from content
+          const text = (r.title + ' ' + r.snippet).toLowerCase();
+          let type = 'Reseller';
+          if (text.includes('itad') || text.includes('asset disposition') || text.includes('decommission')) type = 'ITAD';
+          else if (text.includes('liquidat')) type = 'Liquidator';
+          else if (text.includes('auction')) type = 'Auction';
+          else if (text.includes('recycl') || text.includes('e-waste')) type = 'ITAD';
+
+          // Extract location hints
+          let location = 'USA';
+          const locMatch = r.snippet.match(/([\w\s]+,\s*[A-Z]{2})/);
+          if (locMatch) location = locMatch[1];
+
+          allLeads.push({
+            id: `lead-${Math.random().toString(36).slice(2, 8)}`,
+            company: r.title.split(' - ')[0].split(' | ')[0].trim().slice(0, 60),
+            website,
+            type,
+            description: r.snippet || r.title,
+            location,
+            outreachAngle: `Inquire about bulk GPU inventory from datacenter decommissions`,
+            status: 'new',
+            addedAt: new Date().toISOString(),
+            notes: `Found via: "${query}"`,
+          });
+        }
+
+        await page.close();
+      } catch (err) {
+        console.error(`[Leads] Error scraping "${query}":`, (err as Error).message);
+        await page.close().catch(() => {});
+      }
+    }
+  } finally {
+    await closeBrowser();
+  }
+
+  // Dedup by website
+  const seen = new Set<string>();
+  return allLeads.filter(l => {
+    if (seen.has(l.website)) return false;
+    seen.add(l.website);
+    return true;
+  });
 }
