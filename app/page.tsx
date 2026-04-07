@@ -98,7 +98,7 @@ export default function Dashboard() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent2 flex items-center justify-center">
                 <Cpu className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm font-bold text-white tracking-tight">OpenClaw</span>
+              <span className="text-sm font-bold text-white tracking-tight">GPU Deals</span>
               <span className="text-[10px] text-zinc-600 font-mono hidden sm:inline">GPU NEWS</span>
             </div>
 
