@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron?secret=${CRON_SECRET}",
-      "schedule": "0 0,12 * * *"
+      "schedule": "0 12 * * *"
     }
   ],
   "functions": {
